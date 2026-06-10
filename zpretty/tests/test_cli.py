@@ -1,6 +1,7 @@
 from importlib.resources import files
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from zpretty.cli import CLIRunner
 from zpretty.prettifier import ZPrettifier
 from zpretty.tests.mock import MockCLIRunner
 from zpretty.xml import XMLPrettifier
@@ -227,3 +228,29 @@ class TestCli(TestCase):
                 clirunner.good_paths,
                 sorted([xsd, xslt]),
             )
+
+    def test_atomic_write_replaces_content(self):
+        """--inplace writes are atomic and leave no temporary file behind."""
+        with TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "f.xml")
+            with open(path, "w") as f:
+                f.write("OLD")
+            CLIRunner._atomic_write(path, "NEW")
+            with open(path) as f:
+                self.assertEqual(f.read(), "NEW")
+            self.assertListEqual(os.listdir(tmpdir), ["f.xml"])
+
+    def test_atomic_write_preserves_original_on_failure(self):
+        """A failed --inplace write must leave the original file untouched."""
+        from unittest import mock
+
+        with TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "f.xml")
+            with open(path, "w") as f:
+                f.write("ORIGINAL")
+            with mock.patch("os.replace", side_effect=OSError("boom")):
+                with self.assertRaises(OSError):
+                    CLIRunner._atomic_write(path, "NEW")
+            with open(path) as f:
+                self.assertEqual(f.read(), "ORIGINAL")
+            self.assertListEqual(os.listdir(tmpdir), ["f.xml"])

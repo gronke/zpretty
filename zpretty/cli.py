@@ -9,7 +9,9 @@ from zpretty.prettifier import ZPrettifier
 from zpretty.xml import XMLPrettifier
 from zpretty.zcml import ZCMLPrettifier
 
+import os
 import re
+import tempfile
 
 version = version("zpretty")
 
@@ -208,6 +210,22 @@ class CLIRunner:
 
         return sorted(good_paths)
 
+    @staticmethod
+    def _atomic_write(path, content):
+        """Write ``content`` to ``path`` via a temp file and ``os.replace``."""
+        directory = os.path.dirname(os.path.abspath(path))
+        fd, tmp = tempfile.mkstemp(dir=directory, prefix=".zpretty-", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(content)
+            os.replace(tmp, path)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+
     def run(self):
         """Prettify each filename passed in the command line"""
         encoding = self.config.encoding
@@ -225,8 +243,7 @@ class CLIRunner:
                 self.errors.append(f"{path}: {error}")
                 continue
             if self.config.inplace and not path == "-":
-                with open(path, "w") as f:
-                    f.write(prettified)
+                self._atomic_write(path, prettified)
                 continue
             stdout.write(prettified)
 
