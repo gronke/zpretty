@@ -4,6 +4,7 @@ from os.path import splitext
 from pathlib import Path
 from sys import stderr
 from sys import stdout
+from zpretty.prettifier import ContentLossError
 from zpretty.prettifier import ZPrettifier
 from zpretty.xml import XMLPrettifier
 from zpretty.zcml import ZCMLPrettifier
@@ -214,11 +215,15 @@ class CLIRunner:
             # use Pathlib to check if the file exists and it is a file
             Prettifier = self.choose_prettifier(path)
             prettifier = Prettifier(path, encoding=encoding)
-            if self.config.check:
-                if not prettifier.check():
-                    self.errors.append(f"This file would be rewritten: {path}")
+            try:
+                if self.config.check:
+                    if not prettifier.check():
+                        self.errors.append(f"This file would be rewritten: {path}")
+                    continue
+                prettified = prettifier()
+            except ContentLossError as error:
+                self.errors.append(f"{path}: {error}")
                 continue
-            prettified = prettifier()
             if self.config.inplace and not path == "-":
                 with open(path, "w") as f:
                     f.write(prettified)

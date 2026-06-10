@@ -3,6 +3,7 @@ from bs4.element import Doctype
 from bs4.element import ProcessingInstruction
 from bs4.element import Tag
 from logging import getLogger
+from lxml import etree
 from uuid import uuid4
 from zpretty.elements import PrettyElement
 
@@ -10,6 +11,10 @@ import fileinput
 import re
 
 logger = getLogger(__name__)
+
+
+class ContentLossError(Exception):
+    """Raised when prettifying would drop content from the input."""
 
 
 class ZPrettifier:
@@ -199,8 +204,27 @@ class ZPrettifier:
         """Checks if the input object should be prettified"""
         return self.original_text == self()
 
+    def _assert_no_content_loss(self):
+        """Raise if the input is malformed XML the recover-mode parser truncates."""
+        if self.parser != "xml":
+            return
+        # Only standalone documents; wrapped fragments/non-XML come back as a plain tag.
+        if not isinstance(self.soup, BeautifulSoup):
+            return
+        # self.text is masked already; strip the declaration (lxml rejects an
+        # encoding decl on a str), then reject anything not well-formed.
+        text = re.sub(r"^\s*<\?xml\b[^>]*\?>\s*", "", self.text, count=1)
+        try:
+            etree.fromstring(text)
+        except etree.XMLSyntaxError as exc:
+            raise ContentLossError(
+                f"input is not well-formed XML ({exc}); zpretty would silently "
+                "drop content, so it refuses to continue"
+            ) from exc
+
     def __call__(self):
         if not self.root.getchildren():
             # The parsed content is not even something that looks like an XML
             return self.original_text
+        self._assert_no_content_loss()
         return self.pretty_print(self.root)

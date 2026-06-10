@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 from importlib.resources import files
 from unittest import TestCase
+from zpretty.prettifier import ContentLossError
 from zpretty.xml import XMLElement
 from zpretty.xml import XMLPrettifier
 
@@ -65,3 +66,14 @@ class TestZpretty(TestCase):
         output = XMLPrettifier(text=text)()
         self.assertIn("<root>", output)
         self.assertIn("<child>content</child>", output)
+
+    def test_malformed_xml_raises_instead_of_truncating(self):
+        """Malformed XML must raise rather than be silently truncated."""
+        text = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            "<root>\n"
+            "  <a>text</b>\n"
+            "</root>\n"
+        )
+        with self.assertRaises(ContentLossError):
+            XMLPrettifier(text=text)()
