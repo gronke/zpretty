@@ -125,6 +125,28 @@ class CLIRunner:
             default=None,
         )
         parser.add_argument(
+            "--max-line-length",
+            help=(
+                "Wrap an element's attributes only when the single-line open "
+                "tag would exceed this width. By default (unset) any element "
+                "with two or more attributes is wrapped."
+            ),
+            action="store",
+            dest="max_line_length",
+            type=int,
+            default=None,
+        )
+        parser.add_argument(
+            "--first-attribute-on-new-line",
+            help=(
+                "When wrapping attributes, put the element name alone on the "
+                "first line and indent each attribute under it."
+            ),
+            action="store_true",
+            dest="first_attribute_on_new_line",
+            default=False,
+        )
+        parser.add_argument(
             "paths",
             nargs="*",
             default="-",
@@ -207,12 +229,20 @@ class CLIRunner:
 
         return sorted(good_paths)
 
+    def _apply_layout_config(self, element_class):
+        """Apply the optional attribute-wrapping flags to the element class."""
+        if self.config.max_line_length is not None:
+            element_class.max_line_length = self.config.max_line_length
+        if self.config.first_attribute_on_new_line:
+            element_class.first_attribute_on_new_line = True
+
     def run(self):
         """Prettify each filename passed in the command line"""
         encoding = self.config.encoding
         for path in self.good_paths:
             # use Pathlib to check if the file exists and it is a file
             Prettifier = self.choose_prettifier(path)
+            self._apply_layout_config(Prettifier.pretty_element)
             prettifier = Prettifier(path, encoding=encoding)
             if self.config.check:
                 if not prettifier.check():

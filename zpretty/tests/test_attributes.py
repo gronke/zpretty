@@ -28,6 +28,14 @@ class TestZPrettyAttributess(TestCase):
         self.assertPrettifiedAttributes({}, "")
         self.assertPrettifiedAttributes({}, "", level=2)
 
+    def test_oneline(self):
+        """oneline() joins the sorted attributes on a single line."""
+        self.assertEqual(PrettyAttributes({}).oneline(), "")
+        self.assertEqual(
+            PrettyAttributes({"name": "Lemon", "tasty": "10"}).oneline(),
+            'name="Lemon" tasty="10"',
+        )
+
     def test_one_attribute(self):
         self.assertPrettifiedAttributes({"a": "1"}, 'a="1"')
         self.assertPrettifiedAttributes({"a": "1"}, 'a="1"', level=1)

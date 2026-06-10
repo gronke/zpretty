@@ -108,3 +108,78 @@ class TestPrettyElements(TestCase):
         self.assertEqual(el.getparent().tag, "fake_root")
         self.assertEqual(el.getparent().getparent().tag, "soup")
         self.assertIsNone(el.getparent().getparent().getparent())
+
+
+class TestConfigurableAttributeWrapping(TestCase):
+    """Cake-themed tests for the opt-in attribute-wrapping knobs."""
+
+    def _el(self, klass, text, level=0):
+        soup = BeautifulSoup(
+            "<soup><fake_root>%s</fake_root></soup>" % text, "html.parser"
+        )
+        return klass(soup.fake_root.next_element, level)
+
+    def test_default_two_attrs_break_by_count(self):
+        """Default (no config) keeps the count-based aligned break."""
+        el = self._el(
+            PrettyElement, '<cake name="Lemon Cheesecake" tasty="10">yum</cake>'
+        )
+        self.assertEqual(
+            el(),
+            '<cake name="Lemon Cheesecake"\n      tasty="10"\n>yum</cake>',
+        )
+
+    def test_width_keeps_short_multi_attr_inline(self):
+        """max_line_length keeps a short multi-attribute tag on one line."""
+
+        class WidthCake(PrettyElement):
+            max_line_length = 40
+
+        el = self._el(WidthCake, '<cake id="c1" tasty="10">yum</cake>')
+        self.assertEqual(el(), '<cake id="c1" tasty="10">yum</cake>')
+
+    def test_width_breaks_wide_multi_attr(self):
+        """A tag wider than max_line_length still breaks."""
+
+        class WidthCake(PrettyElement):
+            max_line_length = 40
+
+        el = self._el(
+            WidthCake, '<cake name="Lemon Cheesecake" tasty="10">yum</cake>'
+        )
+        self.assertEqual(
+            el(),
+            '<cake name="Lemon Cheesecake"\n      tasty="10"\n>yum</cake>',
+        )
+
+    def test_indented_break_style(self):
+        """first_attribute_on_new_line: tag alone on line 1, attrs indented."""
+
+        class IndentedCake(PrettyElement):
+            first_attribute_on_new_line = True
+
+        el = self._el(
+            IndentedCake, '<cake name="Lemon Cheesecake" tasty="10">yum</cake>'
+        )
+        self.assertEqual(
+            el(),
+            '<cake\n  name="Lemon Cheesecake"\n  tasty="10"\n>yum</cake>',
+        )
+
+    def test_indented_self_closing(self):
+        """The indented style also applies to self-closing tags."""
+
+        class IndentedCake(PrettyElement):
+            first_attribute_on_new_line = True
+
+        el = self._el(IndentedCake, '<img src="cake.png" alt="A cake" />')
+        self.assertEqual(el(), '<img\n  alt="A cake"\n  src="cake.png"\n/>')
+
+    def test_indented_single_attr_stays_inline(self):
+        """A single attribute is never broken, whatever the style."""
+
+        class IndentedCake(PrettyElement):
+            first_attribute_on_new_line = True
+
+        el = self._el(IndentedCake, '<cake tasty="10">yum</cake>')
+        self.assertEqual(el(), '<cake tasty="10">yum</cake>')

@@ -63,6 +63,9 @@ class PrettyElement:
 
     first_attribute_on_new_line = False
     before_closing_multiline = ""
+    # When set to an int, choose the open-tag layout by the single-line
+    # open-tag width instead of the attribute count; None keeps the count rule.
+    max_line_length = None
 
     self_closing_singleline_attributeless_template = "{prefix}<{tag} />"
     self_closing_singleline_attributefull_template = "{prefix}<{tag} {attributes} />"
@@ -74,6 +77,14 @@ class PrettyElement:
     start_tag_singleline_attributefull_template = "{prefix}<{tag} {attributes}>"
     start_tag_multiline_template = "\n".join(
         ("{prefix}<{tag} {attributes}", "{prefix}{before_closing_multiline}>")
+    )
+    # Used when first_attribute_on_new_line is True: the element name sits
+    # alone on the first line and each attribute is indented under it.
+    indented_self_closing_multiline_template = "\n".join(
+        ("{prefix}<{tag}", "{attributes}", "{prefix}{before_closing_multiline}/>")
+    )
+    indented_start_tag_multiline_template = "\n".join(
+        ("{prefix}<{tag}", "{attributes}", "{prefix}{before_closing_multiline}>")
     )
     escaper = EntitySubstitution()
     preserve_text_whitespace_elements = ["pre"]
@@ -350,26 +361,66 @@ class PrettyElement:
             tag=self.tag,
         )
 
+    def _single_line_open_tag(self, self_closing):
+        """Render the open tag on one line, attributes inline.
+
+        Used both to measure the open-tag width and to render it when it fits,
+        so a multi-attribute tag can collapse to a single line."""
+        if self_closing:
+            template = self.self_closing_singleline_attributefull_template
+        else:
+            template = self.start_tag_singleline_attributefull_template
+        return template.format(
+            before_closing_multiline=self.before_closing_multiline,
+            attributes=self.attributes.oneline(),
+            prefix=self.prefix,
+            tag=self.tag,
+        )
+
+    def _open_tag_fits_one_line(self, self_closing):
+        """Whether the open tag stays on a single line.
+
+        With ``max_line_length`` unset, keep the historic count rule (<= 1
+        attribute inline, otherwise break). With it set, decide by the width
+        of the single-line open tag (a multiline attribute value never fits).
+        """
+        if len(self.attributes) <= 1:
+            return True
+        if self.max_line_length is None:
+            return False
+        single = self._single_line_open_tag(self_closing)
+        if "\n" in single:
+            return False
+        return len(single) <= self.max_line_length
+
     def render_self_closing(self):
         """Render a properly indented a self closing tag"""
-        attributes_len = len(self.attributes)
-        if attributes_len == 0:
-            template = self.self_closing_singleline_attributeless_template
-        elif attributes_len == 1:
-            template = self.self_closing_singleline_attributefull_template
+        if len(self.attributes) == 0:
+            return self._render_template(
+                self.self_closing_singleline_attributeless_template
+            )
+        if self._open_tag_fits_one_line(self_closing=True):
+            return self._single_line_open_tag(self_closing=True)
+        if self.first_attribute_on_new_line:
+            template = self.indented_self_closing_multiline_template
         else:
             template = self.self_closing_multiline_template
         return self._render_template(template)
 
     def render_not_self_closing(self):
         """Render a properly indented not self closing tag"""
-        attributes_len = len(self.attributes)
-        if attributes_len == 0:
-            open_tag_template = self.start_tag_singleline_attributeless_template
-        elif attributes_len == 1:
-            open_tag_template = self.start_tag_singleline_attributefull_template
+        if len(self.attributes) == 0:
+            open_tag = self._render_template(
+                self.start_tag_singleline_attributeless_template
+            )
+        elif self._open_tag_fits_one_line(self_closing=False):
+            open_tag = self._single_line_open_tag(self_closing=False)
+        elif self.first_attribute_on_new_line:
+            open_tag = self._render_template(
+                self.indented_start_tag_multiline_template
+            )
         else:
-            open_tag_template = self.start_tag_multiline_template
+            open_tag = self._render_template(self.start_tag_multiline_template)
 
         text = self.text and self.render_text() or self.render_content()
 
@@ -380,7 +431,6 @@ class PrettyElement:
         else:
             close_tag_template = "</{tag}>"
 
-        open_tag = self._render_template(open_tag_template)
         close_tag = self._render_template(close_tag_template)
         return "{open_tag}{text}{close_tag}".format(
             close_tag=close_tag, open_tag=open_tag, text=text

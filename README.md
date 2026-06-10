@@ -72,6 +72,8 @@ $ zpretty -h
 usage: zpretty [-h] [--encoding ENCODING] [-i] [-v] [-x] [-z] [--check]
                [--include INCLUDE] [--exclude EXCLUDE]
                [--extend-exclude EXTEND_EXCLUDE]
+               [--max-line-length MAX_LINE_LENGTH]
+               [--first-attribute-on-new-line]
                [paths ...]
 
 positional arguments:
@@ -109,6 +111,13 @@ options:
                         Like --exclude, but adds additional files and
                         directories on top of the excluded ones. (Useful if you
                         simply want to add to the default)
+  --max-line-length MAX_LINE_LENGTH
+                        Wrap an element's attributes only when the single-line
+                        open tag would exceed this width. By default (unset) any
+                        element with two or more attributes is wrapped.
+  --first-attribute-on-new-line
+                        When wrapping attributes, put the element name alone on
+                        the first line and indent each attribute under it.
 
 The default exclude pattern is: `/(\.direnv|\.eggs|\.git|\.hg|\.mypy_cache|\.nox
 |\.tox|\.venv|venv|\.svn|\.ipynb_checkpoints|_build|buck-

@@ -22,6 +22,8 @@ class TestCli(TestCase):
         self.assertFalse(config.zcml)
         self.assertEqual(config.encoding, "utf8")
         self.assertFalse(config.check)
+        self.assertIsNone(config.max_line_length)
+        self.assertFalse(config.first_attribute_on_new_line)
 
     def test_short_options(self):
         config = MockCLIRunner("-i", "-x", "-z").config
@@ -30,6 +32,25 @@ class TestCli(TestCase):
     def test_long_options(self):
         config = MockCLIRunner("--inplace", "--xml", "--zcml").config
         self.assertTrue(all((config.inplace, config.xml, config.zcml)))
+
+    def test_attribute_wrapping_flags(self):
+        config = MockCLIRunner(
+            "--max-line-length", "120", "--first-attribute-on-new-line"
+        ).config
+        self.assertEqual(config.max_line_length, 120)
+        self.assertTrue(config.first_attribute_on_new_line)
+
+    def test_apply_layout_config(self):
+        class Element:
+            max_line_length = None
+            first_attribute_on_new_line = False
+
+        runner = MockCLIRunner(
+            "--max-line-length", "120", "--first-attribute-on-new-line"
+        )
+        runner._apply_layout_config(Element)
+        self.assertEqual(Element.max_line_length, 120)
+        self.assertTrue(Element.first_attribute_on_new_line)
 
     def test_file(self):
         html = str(self.sample_folder_path / "sample_html.html")

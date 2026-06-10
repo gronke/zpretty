@@ -231,9 +231,28 @@ class PrettyAttributes:
             lines.append(line)
         return lines
 
+    def oneline(self):
+        """Attributes joined on a single line (used to measure open-tag width)."""
+        return " ".join(self.lines())
+
     def lstrip(self):
-        """This returns the attributes with the left spaces removed"""
+        """Return the attributes with the left spaces removed.
+
+        In the indented (first_attribute_on_new_line) style the first
+        attribute keeps its indentation, so do not strip.
+        """
+        if self.element and getattr(
+            self.element, "first_attribute_on_new_line", False
+        ):
+            return self()
         return self().lstrip()
+
+    def indent_prefix(self):
+        """Indent for attributes in the first_attribute_on_new_line style:
+        the element prefix plus one regular indent."""
+        if self.element is None:
+            return self._multiline_prefix
+        return self.element.prefix + self.element.indent
 
     def __call__(self):
         """Render the attributes as text
@@ -247,7 +266,11 @@ class PrettyAttributes:
         if len(self) == 1:
             for line in self.lines():
                 return line
-        if self.element:
+        if self.element and getattr(
+            self.element, "first_attribute_on_new_line", False
+        ):
+            prefix = self.indent_prefix()
+        elif self.element:
             prefix = self.element.prefix + self.prefix
         else:
             prefix = ""
